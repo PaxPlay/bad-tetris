@@ -34,6 +34,11 @@ private:
     CTexture *baseTexture;
     TetrisColor occupied[FIELD_WIDTH][FIELD_HEIGHT];
     CTetrisPawn *currentPawn;
+    CTetrisPawn *next;
+    TTF_Font *font;
+    float stepTime;
+    int score;
+    int highscore;
 };
 
 

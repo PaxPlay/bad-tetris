@@ -7,8 +7,10 @@
 #include <cstdlib>
 #include <ctime>
 #include <iostream>
+#include <fstream>
 
 void CTetrisGame::OnInit() {
+    TTF_Init();
     baseTexture = new CTexture("../tetris.bmp", getRenderer());
 
     for (auto &column : occupied) {
@@ -18,26 +20,54 @@ void CTetrisGame::OnInit() {
     }
 
     srand(time(nullptr));
+    next = new CTetrisPawn(pawns[rand() % 7]);
     currentPawn = new CTetrisPawn(pawns[rand() % 7]);
+    stepTime = 1000.0f;
+    score = 0;
+
+    font = TTF_OpenFont("/usr/share/fonts/TTF/DejaVuSans.ttf", 48);
+    if (!font) {
+        std::cout << SDL_GetError() << std::endl;
+    }
+
+    std::fstream file;
+    file.open("highscore.dat", std::fstream::in | std::fstream::binary);
+    if (file.good()) {
+        file.read((char*)&highscore, sizeof(int));
+        file.close();
+    }
 }
 
 void CTetrisGame::OnCleanup() {
+    if (score > highscore) {
+        std::fstream file;
+        file.open("highscore.dat", std::fstream::out | std::fstream::binary);
+        if (file.good()) {
+            file.write((char*)&score, sizeof(int));
+            file.close();
+        }
+    }
     delete baseTexture;
     delete currentPawn;
+    delete next;
+    TTF_CloseFont(font);
 }
 
-#define LIMIT 1000
 void CTetrisGame::OnThink() {
     static int lastDrop = SDL_GetTicks();
     int current_tick = SDL_GetTicks();
     int elapsed = current_tick - lastDrop;
-    if (elapsed > LIMIT) {
+
+    auto *state = SDL_GetKeyboardState(nullptr);
+    int threshold = (int)((state[SDL_SCANCODE_DOWN]) ? (stepTime / 4) : stepTime);
+    if (elapsed > threshold) {
         if (currentPawn->canMoveDown(this)) {
             currentPawn->moveDown();
         } else {
             currentPawn->copyToArray(this);
             checkRows();
-            *currentPawn = CTetrisPawn(pawns[rand() % 7]);
+            *currentPawn = *next;
+            *next = CTetrisPawn(pawns[rand() % 7]);
             if (currentPawn->collides(this)) {
                 quit();
             }
@@ -70,6 +100,31 @@ void CTetrisGame::OnRender() {
     }
 
     currentPawn->draw(baseTexture);
+    next->drawIndicator(baseTexture);
+
+    char sscore[256];
+    char shscore[256];
+    sprintf(sscore, "Score: %d", score);
+    sprintf(shscore, "Highscore: %d", highscore);
+
+    SDL_Color white = { 255, 255, 255 };
+    SDL_Surface *surface = TTF_RenderText_Solid(font, sscore, white);
+    SDL_Texture *tex = SDL_CreateTextureFromSurface(getRenderer(), surface);
+
+    SDL_Rect src = { 0, 0, BLOCK_SIZE * 16, BLOCK_SIZE * 4 };
+    SDL_Rect dst = { BLOCK_SIZE * 13, BLOCK_SIZE * 10, BLOCK_SIZE * 4, BLOCK_SIZE * 1 };
+    SDL_RenderCopy(getRenderer(), tex, &src, &dst);
+    SDL_FreeSurface(surface);
+    SDL_DestroyTexture(tex);
+
+    surface = TTF_RenderText_Solid(font, shscore, white);
+    tex = SDL_CreateTextureFromSurface(getRenderer(), surface);
+
+    dst = { BLOCK_SIZE * 13, BLOCK_SIZE * 11, BLOCK_SIZE * 4, BLOCK_SIZE * 1 };
+    SDL_RenderCopy(getRenderer(), tex, &src, &dst);
+
+    SDL_FreeSurface(surface);
+    SDL_DestroyTexture(tex);
 }
 
 bool CTetrisGame::isOccupied(size_t x, size_t y) const {
@@ -113,11 +168,17 @@ void CTetrisGame::OnKeyboardInput(SDL_KeyboardEvent *event) {
 }
 
 void CTetrisGame::checkRows() {
+    int count = 0;
     for (int y = 0; y < FIELD_HEIGHT; y++) {
         if (isRowComplete(y)) {
             deleteRow(y);
             y--; // repeat this row since it got deleted
+            count++;
         }
+    }
+    if (count > 0) {
+        score += (int)((1000 / stepTime) * (float)(count * count));
+        std::cout << "Score: " << score << std::endl;
     }
 }
 
@@ -137,6 +198,8 @@ void CTetrisGame::deleteRow(int row) {
             setField(x, y, getField(x, y + 1));
         }
     }
+
+    stepTime *= 0.95;
 }
 
 TetrisColor CTetrisGame::getField(size_t x, size_t y) const {

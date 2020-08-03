@@ -33,6 +33,7 @@ public:
 
     void draw(CTexture *texture) const;
     void draw(CTexture *texture, Vector2D<int8_t> origin) const;
+    void drawIndicator(CTexture *texture) const;
 
     bool canMoveDown(const CTetrisGame *game) const;
     bool canMoveSideways(const CTetrisGame *game, bool right) const;

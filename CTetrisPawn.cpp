@@ -35,6 +35,10 @@ void CTetrisPawn::draw(CTexture *texture, Vector2D<int8_t> origin) const {
     }
 }
 
+void CTetrisPawn::drawIndicator(CTexture *texture) const {
+    draw(texture, {16, 16});
+}
+
 bool CTetrisPawn::canMoveDown(const CTetrisGame *game) const {
     for (auto &block : blocks) {
         Vector2D<int8_t> pos = position + block;
